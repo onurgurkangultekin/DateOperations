@@ -2,6 +2,13 @@ import datetime as dt
 import calendar
 from math import ceil
 import pandas as pd
+from matplotlib import pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import minmax_scale
+
+
+def day_of_year(date):
+    return date.timetuple().tm_yday
 
 
 def week_of_month(date):
@@ -11,6 +18,10 @@ def week_of_month(date):
     dom = date.day
     adjusted_dom = dom + first_day.weekday()
     return int(ceil(adjusted_dom / 7.0))
+
+
+def week_of_year(date):
+    return date.isocalendar()[1]
 
 
 def get_season(date):
@@ -62,7 +73,7 @@ def convert_to_vector(date: dt.date):
                    date.month,
                    date.isoweekday(),
                    week_of_month(date),
-                   date.isocalendar()[1],
+                   week_of_year(date),
                    get_season(date),
                    is_first_working_day_of_month(date),
                    is_last_working_day_of_month(date),
@@ -72,41 +83,37 @@ def convert_to_vector(date: dt.date):
     return date_vector
 
 
-def create_date_frame():
+def create_date_frame(data):
+    # convert string to date
+    dates = [dt.datetime.strptime(x, '%d-%b-%y') for x in data['Date']]
+    # convert date to array
+    vector_dates = [convert_to_vector(d) for d in dates]
+    df = pd.DataFrame(vector_dates, columns=['day', 'month', 'dayofweek', 'weekofmonth', 'weekofyear', 'season',
+                                             'isfirstworkingday', 'islastworkingday', 'isweekend', 'ismiddleofmonth'])
+    df['Price'] = data['Price']
+    df.to_csv('data/converted.csv')
+    return df
+
+
+def normalize_features(data: pd.DataFrame):
+    df = pd.DataFrame(data)
+    df = df.drop('Price', axis=1)
+    df_norm = (df - df.min()) / (df.max() - df.min())
+    df_norm['Price'] = data['Price']
+    df_norm.to_csv('data/normalized.csv')
+    return df_norm
+
+
+def plot_tests():
+    series = pd.Series.from_csv('data/ts.csv', header=0)
+    print(series.head())
+    series.plot()
+    plt.show()
+
+
+if __name__ == '__main__':
+    today = dt.date.today()
     data = pd.read_csv("data/ts.csv")
-
-
-    frame = pd.DataFrame(None, columns=['day', 'month', 'weekofday', 'weekofmonth', 'weekofyear', 'season',
-                                               'isfirstworkingday', 'islastworkingday', 'isweekend', 'ismiddleofmonth'])
-
-    dates = [date in data]
-    for date in data.get(('Date')):
-        print(date)
-        date_vector = dt.datetime.strptime(date, '%b-%m-%y')
-
-        frame.append(convert_to_vector(date))
-    today = dt.date.today().replace(day=29)
-
-    return frame
-
-
-#
-# print(today)
-#
-# print("day of month", today.day)
-# print("month of year", today.month)
-# print("day of week", today.isoweekday())
-# print("week of the month", week_of_month(today))
-# print("week of the year", today.isocalendar()[1])
-# print("season", (today.month % 12 + 3) // 3)
-# print("is start of the month", int(today.day == 1))
-# print("is end of the month", int(calendar.monthrange(today.year, today.month)[1] == today.day))
-# print("is weekend", int(today.isoweekday() > 5))
-
-
-print(pd.date_range('1/1/2000', '2/1/2000', freq='BMS'))
-
-date = dt.date(2018, 9, 15)
-# print(is_first_working_day_of_month(date))
-# print(is_last_working_day_of_month(date))
-create_date_frame()
+    data = create_date_frame(data)
+    data = normalize_features(data)
+    print(data)
